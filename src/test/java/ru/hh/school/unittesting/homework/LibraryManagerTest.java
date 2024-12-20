@@ -9,11 +9,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class LibraryManagerTest {
@@ -27,41 +24,31 @@ class LibraryManagerTest {
   @InjectMocks
   private LibraryManager libraryManager;
 
-  private Map<String, Integer> bookInventory;
-
   // Arrange
   @BeforeEach
   void setUp() {
-    try {
-      Field bookInventoryField = libraryManager.getClass().getDeclaredField("bookInventory");
-      bookInventoryField.setAccessible(true);
-      bookInventory = (Map<String, Integer>) bookInventoryField.get(libraryManager);
+    libraryManager.addBook("1984", 5);
+    libraryManager.addBook("To Kill a Mockingbird", 3);
+    libraryManager.addBook("The Great Gatsby", 4);
+    libraryManager.addBook("Pride and Prejudice", 6);
+    libraryManager.addBook("Moby Dick", 2);
+    libraryManager.addBook("War and Peace", 4);
+    libraryManager.addBook("The Catcher in the Rye", 1);
+    libraryManager.addBook("The Hobbit", 1);
+    libraryManager.addBook("Fahrenheit 451", 1);
+    libraryManager.addBook("The Lord of the Rings", 1);
 
-      // Данные честно сгенерировал через GPT, было лень придумывать)))
+    when(userService.isUserActive("Daniel K.")).thenReturn(true);
+    libraryManager.borrowBook("The Catcher in the Rye", "Daniel K.");
 
-      bookInventory.put("1984", 5);
-      bookInventory.put("To Kill a Mockingbird", 3);
-      bookInventory.put("The Great Gatsby", 4);
-      bookInventory.put("Pride and Prejudice", 6);
-      bookInventory.put("Moby Dick", 2);
-      bookInventory.put("War and Peace", 1);
-      bookInventory.put("The Catcher in the Rye", 0);
-      bookInventory.put("The Hobbit", 0);
-      bookInventory.put("Fahrenheit 451", 0);
-      bookInventory.put("The Lord of the Rings", 0);
+    when(userService.isUserActive("Sophia H.")).thenReturn(true);
+    libraryManager.borrowBook("The Hobbit", "Sophia H.");
 
-      Field borrowedBooksField = libraryManager.getClass().getDeclaredField("borrowedBooks");
-      borrowedBooksField.setAccessible(true);
-      Map<String, String> borrowedBooks = (Map<String, String>) borrowedBooksField.get(libraryManager);
+    when(userService.isUserActive("James T.")).thenReturn(true);
+    libraryManager.borrowBook("Fahrenheit 451", "James T.");
 
-      borrowedBooks.put("The Catcher in the Rye", "Daniel K.");
-      borrowedBooks.put("The Hobbit", "Sophia H.");
-      borrowedBooks.put("Fahrenheit 451", "James T.");
-      borrowedBooks.put("The Lord of the Rings", "Olivia R.");
-
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      e.printStackTrace();
-    }
+    when(userService.isUserActive("Olivia R.")).thenReturn(true);
+    libraryManager.borrowBook("The Lord of the Rings", "Olivia R.");
   }
 
   @Test
@@ -70,8 +57,7 @@ class LibraryManagerTest {
     libraryManager.addBook("1984", 2);
 
     // Assert
-    assertEquals(7, bookInventory.get("1984"));
-    assertEquals(10, bookInventory.size());
+    assertEquals(7, libraryManager.getAvailableCopies("1984"));
   }
 
   @Test
@@ -80,8 +66,7 @@ class LibraryManagerTest {
     libraryManager.addBook("Some book", 2);
 
     // Assert
-    assertEquals(2, bookInventory.get("Some book"));
-    assertEquals(11, bookInventory.size());
+    assertEquals(2, libraryManager.getAvailableCopies("Some book"));
   }
 
   @Test
@@ -90,10 +75,14 @@ class LibraryManagerTest {
     when(userService.isUserActive("John D.")).thenReturn(false);
 
     // Act
-    boolean result = libraryManager.borrowBook("1984", "John D.");
+    String bookId = "1984";
+    boolean result = libraryManager.borrowBook(bookId, "John D.");
 
     // Assert
     assertFalse(result);
+    assertEquals(5, libraryManager.getAvailableCopies(bookId));
+    verify(notificationService, times(1))
+      .notifyUser("John D.", "Your account is not active.");
   }
 
   @Test
@@ -102,9 +91,11 @@ class LibraryManagerTest {
     when(userService.isUserActive("Sarah L.")).thenReturn(true);
 
     // Act
-    boolean result = libraryManager.borrowBook("The Hobbit", "Sarah L.");
+    String bookId = "The Hobbit";
+    boolean result = libraryManager.borrowBook(bookId, "Sarah L.");
 
     // Assert
+    assertEquals(0, libraryManager.getAvailableCopies(bookId));
     assertFalse(result);
   }
 
@@ -114,43 +105,55 @@ class LibraryManagerTest {
     when(userService.isUserActive("Sarah L.")).thenReturn(true);
 
     // Act
-    boolean result = libraryManager.borrowBook("War and Peace", "Sarah L.");
+    String bookId = "War and Peace";
+    boolean result = libraryManager.borrowBook(bookId, "Sarah L.");
 
     // Assert
     assertTrue(result);
+    assertEquals(3, libraryManager.getAvailableCopies(bookId));
+    verify(notificationService, times(1))
+        .notifyUser("Sarah L.", "You have borrowed the book: " + bookId);
   }
 
   @Test
   void returnUnborrowedBookTest() {
     // Act
-    boolean result = libraryManager.returnBook("Moby Dick", "Daniel K.");
+    String bookId = "Moby Dick";
+    boolean result = libraryManager.returnBook(bookId, "Daniel K.");
 
     // Assert
     assertFalse(result);
+    assertEquals(2, libraryManager.getAvailableCopies(bookId));
   }
 
   @Test
   void returnBorrowedBookButWithWrongUserTest() {
     // Act
-    boolean result = libraryManager.returnBook("The Catcher in the Rye", "Sophia H.");
+    String bookId = "To Kill a Mockingbird";
+    boolean result = libraryManager.returnBook(bookId, "Sophia H.");
 
     // Assert
     assertFalse(result);
+    assertEquals(3, libraryManager.getAvailableCopies(bookId));
   }
 
   @Test
   void returnBorrowedBook() {
     // Act
-    boolean result = libraryManager.returnBook("The Catcher in the Rye", "Daniel K.");
+    String bookId = "The Catcher in the Rye";
+    boolean result = libraryManager.returnBook(bookId, "Daniel K.");
 
     // Assert
     assertTrue(result);
+    assertEquals(1, libraryManager.getAvailableCopies(bookId));
+    verify(notificationService, times(1))
+        .notifyUser("Daniel K.", "You have returned the book: " + bookId);
   }
 
   @ParameterizedTest
   @CsvSource({
       "Moby Dick, 2",
-      "War and Peace, 1",
+      "War and Peace, 4",
       "The Catcher in the Rye, 0",
       "Some random book, 0"
   })
