@@ -36,7 +36,7 @@ class LibraryManagerTest {
     libraryManager.addBook("The Catcher in the Rye", 1);
     libraryManager.addBook("The Hobbit", 1);
     libraryManager.addBook("Fahrenheit 451", 1);
-    libraryManager.addBook("The Lord of the Rings", 1);
+    libraryManager.addBook("The Lord of the Rings", 2);
 
     when(userService.isUserActive("Daniel K.")).thenReturn(true);
     libraryManager.borrowBook("The Catcher in the Rye", "Daniel K.");
@@ -129,12 +129,12 @@ class LibraryManagerTest {
   @Test
   void returnBorrowedBookButWithWrongUserTest() {
     // Act
-    String bookId = "To Kill a Mockingbird";
+    String bookId = "The Lord of the Rings";
     boolean result = libraryManager.returnBook(bookId, "Sophia H.");
 
     // Assert
     assertFalse(result);
-    assertEquals(3, libraryManager.getAvailableCopies(bookId));
+    assertEquals(1, libraryManager.getAvailableCopies(bookId));
   }
 
   @Test
